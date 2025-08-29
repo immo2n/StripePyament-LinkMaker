@@ -68,6 +68,9 @@ jobs:
             # Start/restart Next.js with production variables
             PORT=3000 NODE_ENV=production pm2 start npm --name "diligent_app" -- start
 
+            echo "⌚ Waiting for the service to start..."
+            sleep 10
+
             echo "🌐 Testing basic connectivity..."
             if curl -f http://localhost:3000 > /dev/null 2>&1; then
               echo "✅ Basic connectivity successful"
