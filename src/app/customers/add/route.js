@@ -1,10 +1,10 @@
 import { getStripe } from "@/lib/clients/stripe/server";
-const stripe = getStripe();
 
 export async function POST(req) {
   const { name, email } = await req.json();
 
   try {
+    const stripe = getStripe();
     const customer = await stripe.customers.create({ name, email });
 
     if (!customer?.id || !customer.id.startsWith("cus_")) {
