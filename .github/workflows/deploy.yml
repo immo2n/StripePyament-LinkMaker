@@ -12,23 +12,24 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: 🛠️ Install Node.js & Dependencies
+      - name: 🛠️ Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
-      - run: npm ci --omit=dev
 
-      - name: 🏗️ Build Next.js App
-        run: npm run build
+      - name: 📦 Install dependencies & Build
+        run: |
+          npm ci
+          npm run build
 
-      - name: 📦 Package Production Build
+      - name: 📂 Prepare production package
         run: |
           mkdir deploy
           cp -r .next package.json public deploy/
           [ -f next.config.js ] && cp next.config.js deploy/ || true
           cd deploy && tar -czf ../diligent.tar.gz .
 
-      - name: 📤 Upload to EC2
+      - name: 📤 Copy build to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -37,42 +38,58 @@ jobs:
           source: "diligent.tar.gz"
           target: "/home/ubuntu/diligent"
 
-      - name: 🚀 Deploy on EC2
+      - name: 🚀 Deploy & Health Check
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            set -e
-            echo "📦 Updating Node.js & PM2 if needed..."
+            echo "📦 Ensuring Node.js & PM2 are installed..."
             if ! command -v pm2 &> /dev/null; then
               curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
               sudo apt-get install -y nodejs
               sudo npm install -g pm2
             fi
 
-            echo "📂 Deploying build..."
+            echo "📂 Extracting new build..."
             cd /home/ubuntu/diligent
-            rm -rf .next public node_modules || true
             tar -xzf diligent.tar.gz
+            npm install
 
-            echo "📦 Installing production dependencies..."
-            npm ci --omit=dev
+            echo "📂 Loading environment variables..."
+            set -a
+            source /home/ubuntu/diligent/.env
+            set +a
 
-            echo "🌍 Starting application..."
-            pm2 startOrReload ecosystem.config.js --only diligent_app || \
+            # Stop old PM2 process if running
+            pm2 stop diligent_app || true
+
+            # Start/restart Next.js with production variables
             PORT=3000 NODE_ENV=production pm2 start npm --name "diligent_app" -- start
 
-            echo "⌛ Waiting for app to respond..."
-            for i in {1..10}; do
-              if curl -fs http://localhost:3000/api/health; then
-                echo "✅ Deployment successful!"
-                exit 0
+            echo "⌚ Waiting for the service to start..."
+            MAX_RETRIES=10
+            SLEEP_INTERVAL=3
+            SUCCESS=false
+
+            for i in $(seq 1 $MAX_RETRIES); do
+              if curl -fs http://localhost:3000/api/health > /dev/null 2>&1; then
+                echo "✅ Service is healthy (checked after $((i * SLEEP_INTERVAL))s)"
+                SUCCESS=true
+                break
               fi
-              sleep 3
+              echo "⏳ Attempt $i/$MAX_RETRIES: Service not ready yet..."
+              sleep $SLEEP_INTERVAL
             done
 
-            echo "❌ Deployment failed - showing logs:"
-            pm2 logs diligent_app
-            exit 1
+            if [ "$SUCCESS" = false ]; then
+              echo "❌ Health check failed after $((MAX_RETRIES * SLEEP_INTERVAL))s"
+              echo "Manual checkup needed!"
+              echo "📊 PM2 logs:"
+              pm2 logs diligent_app
+              exit 1
+            fi
+
+
+            echo "🚀 Deployment complete!"
