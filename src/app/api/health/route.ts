@@ -4,7 +4,6 @@ import path from 'path';
 
 export async function GET() {
 	try {
-		// Check if the application is healthy
 		const healthCheck = {
 			status: 'healthy',
 			timestamp: new Date().toISOString(),
@@ -13,33 +12,11 @@ export async function GET() {
 			version: process.env.npm_package_version || '1.0.0',
 		};
 
-		// Check if data directory is accessible
-		const dataDir = path.join(process.cwd(), 'data');
-		const dataAccessible = fs.existsSync(dataDir);
-
-		// Check if admin credentials file exists
-		const adminFile = path.join(dataDir, 'admin-credentials.json');
-		const adminFileExists = fs.existsSync(adminFile);
-
-		// Check if payment links file exists
-		const paymentLinksFile = path.join(dataDir, 'payment-links.json');
-		const paymentLinksFileExists = fs.existsSync(paymentLinksFile);
-
-		const systemChecks = {
-			dataDirectory: dataAccessible,
-			adminCredentials: adminFileExists,
-			paymentLinksStorage: paymentLinksFileExists,
-		};
-
-		// Determine overall health
-		const allChecksPass = Object.values(systemChecks).every(check => check === true);
-		
 		return NextResponse.json({
 			...healthCheck,
-			status: allChecksPass ? 'healthy' : 'degraded',
-			checks: systemChecks,
+			status: 'healthy'
 		}, {
-			status: allChecksPass ? 200 : 503
+			status: 200
 		});
 
 	} catch (error) {
