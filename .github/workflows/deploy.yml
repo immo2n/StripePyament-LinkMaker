@@ -1,0 +1,87 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: 📦 Install dependencies & Build
+        run: |
+          npm ci
+          npm run build
+
+      - name: 📂 Prepare production package
+        run: |
+          mkdir deploy
+          cp -r .next package.json next.config.js public deploy/
+          cd deploy && tar -czf ../diligent.tar.gz .
+
+      - name: 📤 Copy build to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "diligent.tar.gz"
+          target: "/home/ubuntu/diligent"
+
+      - name: 🚀 Deploy & Health Check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "📦 Ensuring Node.js & PM2 are installed..."
+            if ! command -v pm2 &> /dev/null; then
+              curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+              sudo npm install -g pm2
+            fi
+
+            echo "📂 Extracting new build..."
+            cd /home/ubuntu/diligent
+            tar -xzf diligent.tar.gz
+
+            echo "📂 Loading environment variables..."
+            set -a
+            source /home/ubuntu/diligent/.env
+            set +a
+
+            echo "🧪 Starting temporary instance on port 3001 for health check..."
+            PORT=3001 NODE_ENV=production nohup npm start > /dev/null 2>&1 &
+            sleep 10
+
+            echo "🔍 Running health check..."
+            if curl -fs http://localhost:3001/api/health | grep -q '"status":"healthy"'; then
+              echo "✅ Health check passed. Restarting main app..."
+              
+              # Stop old PM2 process if running
+              pm2 stop diligent_app || true
+
+              # Start/restart Next.js with production variables
+              PORT=3000 NODE_ENV=production pm2 start npm --name "diligent_app" -- start
+
+              pm2 save
+            else
+              echo "❌ Health check failed! Aborting deployment."
+              pkill -f "PORT=3001" || true
+              exit 1
+            fi
+
+            echo "🛑 Stopping temporary health check instance..."
+            pkill -f "PORT=3001" || true
+
+            echo "🚀 Deployment complete!"
