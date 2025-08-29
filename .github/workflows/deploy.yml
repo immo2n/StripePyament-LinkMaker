@@ -55,6 +55,7 @@ jobs:
             echo "📂 Extracting new build..."
             cd /home/ubuntu/diligent
             tar -xzf diligent.tar.gz
+            npm install
 
             echo "📂 Loading environment variables..."
             set -a
