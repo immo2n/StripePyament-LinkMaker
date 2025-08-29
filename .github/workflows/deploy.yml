@@ -26,6 +26,7 @@ jobs:
         run: |
           mkdir deploy
           cp -r .next package.json next.config.js public deploy/
+          [ -f next.config.js ] && cp next.config.js deploy/ || true
           cd deploy && tar -czf ../diligent.tar.gz .
 
       - name: 📤 Copy build to EC2
