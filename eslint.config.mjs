@@ -6,20 +6,22 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const compat = new FlatCompat({
-	baseDirectory: __dirname,
+  baseDirectory: __dirname,
 });
 
 const eslintConfig = [
-	...compat.extends("next/core-web-vitals", "next/typescript"),
-	{
-		rules: {
-			"react/no-unescaped-entities": "off",
-			"@typescript-eslint/no-unused-vars": "warn",
-			"@typescript-eslint/no-explicit-any": "off",
-			"react-hooks/exhaustive-deps": "warn",
-			"@typescript-eslint/no-unused-expressions": "off",
-		},
-	},
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  {
+    // Ignore Prisma generated files entirely
+    ignores: ["src/generated/prisma/**"],
+
+    rules: {
+      "@typescript-eslint/no-unused-vars": "warn",
+      "react-hooks/exhaustive-deps": "warn",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-expressions": "off", // for your own code if necessary
+    },
+  },
 ];
 
 export default eslintConfig;

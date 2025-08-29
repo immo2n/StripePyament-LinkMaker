@@ -1,0 +1,4 @@
+# Ignore all generated Prisma files
+src/generated/prisma/**
+# Ignore Prisma generated code
+src/generated/prisma/**
