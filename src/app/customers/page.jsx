@@ -1,58 +1,178 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LayoutDashboard, Plus, Search, User2 } from "lucide-react";
+import {
+  LayoutDashboard,
+  Loader2,
+  MessageCircle,
+  Plus,
+  PlusCircle,
+  Search,
+  User2,
+  UserPlus2,
+} from "lucide-react";
 import Image from "next/image";
-import { email } from "zod/v4";
 import { EnvelopeIcon } from "@phosphor-icons/react";
 
 export default function Customers() {
-  // Generate dummy customer data
-  const generateCustomers = (count = 100) => {
-    return Array.from({ length: count }, (_, i) => ({
-      id: i + 1,
-      name: `Customer ${i + 1}`,
-      email: `customer${i + 1}@example.com`,
-    }));
+  const [customers, setCustomers] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 15;
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      fetchCustomers(1, query);
+      setCurrentPage(1);
+    }, 500);
+
+    return () => clearTimeout(delayDebounce);
+  }, [query]);
+
+  async function fetchCustomers(page = 1, query = "") {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: itemsPerPage.toString(),
+      });
+      if (query.trim()) {
+        params.append("query", query.trim());
+      }
+
+      const res = await fetch(`/customers/list?${params.toString()}`);
+      const data = await res.json();
+
+      if (res.ok) {
+        setCustomers(data.customers);
+        setTotalPages(data.meta.totalPages);
+      } else {
+        console.error("Failed to fetch customers:", data.error);
+        alert("Customer fetch failed, check internet connection!");
+      }
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchCustomers(currentPage);
+  }, [currentPage]);
+
+  const validateEmail = (email) => {
+    return String(email)
+      .toLowerCase()
+      .match(
+        /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+      );
   };
 
-  const allCustomers = generateCustomers();
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
-  const [showAddCustomer, setShowAddCustomer] = useState(false);
-
-  const totalPages = Math.ceil(allCustomers.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentCustomers = allCustomers.slice(
-    startIndex,
-    startIndex + itemsPerPage
-  );
-
   /** Modal objects to add new customer */
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [formData, setFormData] = useState({
     clientName: "",
-    clientEmail: ""
+    clientEmail: "",
+    clientRemarks: "",
   });
 
+  const [modalMessage, setModalMessage] = useState("");
+  const [addingCustomer, setAddingCustomer] = useState(false);
+
   async function createCustomer() {
+    if (addingCustomer) return;
+    setModalMessage("Adding customer, please wait...");
+    const { clientName, clientEmail, clientRemarks } = formData;
+
+    if (!clientEmail || !validateEmail(clientEmail)) {
+      setModalMessage("Please enter a valid email address.");
+      return;
+    }
+
+    setAddingCustomer(true);
     const res = await fetch("/customers/add", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: "Jenny Rosen",
-        email: "jennyrosen@example.com",
+        name: clientName,
+        email: clientEmail,
+        remarks: clientRemarks,
       }),
     });
 
     const data = await res.json();
-    console.log(data);
+    setAddingCustomer(false);
 
+    switch (res.status) {
+      case 200:
+        console.log("Customer created successfully:", data.customer);
+        setModalMessage(data.status || "Customer created successfully!");
 
+        setShowAddCustomer(false);
+        setFormData({
+          clientName: "",
+          clientEmail: "",
+          clientRemarks: "",
+        });
 
+        break;
 
-    
+      case 409:
+        console.warn("Conflict:", data.error);
+        setModalMessage(data.error || "Customer already exists!");
+        break;
+
+      case 500:
+        console.error("Server error:", data.error);
+        setModalMessage("Internal server error. Please try again later.");
+        break;
+
+      default:
+        console.error("Unexpected response:", data);
+        setModalMessage("Unexpected error occurred!");
+    }
   }
+
+  async function makeEnrollmentLink(customer) {
+    if (makingLinkModal) return;
+    setMakingLinkModal(true);
+    setEnrollMessage("Making enrollment link for user...");
+
+    const id = customer.stripeCustomerId;
+    setEnrollName(customer.name);
+    setEnrollEmail(customer.email);
+
+    const res = await fetch("/customers/enroll", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId: id,
+        email: customer.email
+      }),
+    });
+    const data = await res.json();
+    setEnrollMessage("");
+    switch (res.status) {
+      case 200:
+        console.log(data);
+
+        break;
+      case 500:
+      case 400:
+        console.error(data.error);
+        setEnrollMessage("Server error: " + data.error);
+        break;
+    }
+  }
+
+  const [makingLinkModal, setMakingLinkModal] = useState(false);
+  const [enrollName, setEnrollName] = useState("N/A");
+  const [enrollEmail, setEnrollEmail] = useState("N/A");
+  const [enrollMessage, setEnrollMessage] = useState("");
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-cyan-50">
@@ -117,14 +237,7 @@ export default function Customers() {
         <div className="flex items-center justify-between mb-6 gap-4">
           <Button
             onClick={() => {
-                
-                createCustomer()
-                    
-                    return;
-                
-                setShowAddCustomer(true);
-            
-            
+              setShowAddCustomer(true);
             }}
             className="flex items-center bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg"
           >
@@ -135,8 +248,10 @@ export default function Customers() {
           <div className="flex items-center flex-1 max-w-md border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm">
             <Search className="w-4 h-4 text-gray-400 mr-2" />
             <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               type="text"
-              placeholder="Search customers... email, fullname"
+              placeholder="Search customers... email, fullname, remarks"
               className="w-full outline-none bg-transparent text-sm text-gray-700"
             />
           </div>
@@ -144,33 +259,63 @@ export default function Customers() {
 
         {/** Customers List */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <table className="w-full border-collapse">
-            <thead className="bg-gray-100 border-b">
-              <tr>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
-                  ID
-                </th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
-                  Name
-                </th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
-                  Email
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentCustomers.map((customer) => (
-                <tr
-                  key={customer.id}
-                  className="border-b last:border-none hover:bg-gray-50"
-                >
-                  <td className="px-4 py-3 text-sm">{customer.id}</td>
-                  <td className="px-4 py-3 text-sm">{customer.name}</td>
-                  <td className="px-4 py-3 text-sm">{customer.email}</td>
+          {loading ? (
+            <div className="p-4 text-center text-gray-500">
+              Loading customers...
+              {query.trim().length > 0 ? " for: " + query : ""}
+            </div>
+          ) : (
+            <table className="w-full border-collapse">
+              <thead className="bg-gray-100 border-b">
+                <tr>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
+                    #SL
+                  </th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
+                    Name
+                  </th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
+                    Email
+                  </th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
+                    Remarks
+                  </th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {customers.map((customer, index) => (
+                  <tr
+                    key={customer.id}
+                    className="border-b last:border-none hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-3 text-sm">
+                      {(currentPage - 1) * itemsPerPage + (index + 1)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">{customer.name}</td>
+                    <td className="px-4 py-3 text-sm">{customer.email}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {customer.remarks ? (
+                        customer.remarks
+                      ) : (
+                        <span className="font-gray-500">N/A</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <Button
+                        onClick={() => makeEnrollmentLink(customer)}
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white hover:text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                      >
+                        <PlusCircle /> Add Pyament Method
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/** Pagination */}
@@ -199,9 +344,15 @@ export default function Customers() {
       {showAddCustomer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900">
+            <h2 className="text-2xl font-bold mb-3 text-gray-900">
               Add New Customer
             </h2>
+
+            {modalMessage.length > 0 && (
+              <div className="mb-4 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm">
+                <p>{modalMessage}</p>
+              </div>
+            )}
 
             <div className="space-y-4">
               {/* Required Fields */}
@@ -245,16 +396,17 @@ export default function Customers() {
 
                   <div>
                     <label className="flex gap-1 block text-sm font-medium text-gray-700 mb-1">
-                      <EnvelopeIcon className="h-5 w-5" /> Email*
+                      <MessageCircle className="h-5 w-5" /> Remarks (optional)
                     </label>
                     <Input
-                      type="email"
-                      placeholder="Enter a valid email of the customer"
-                      value={formData.clientEmail}
+                      maxLength="250"
+                      type="text"
+                      placeholder="Additional info about the customer"
+                      value={formData.clientRemarks}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          clientEmail: e.target.value,
+                          clientRemarks: e.target.value,
                         })
                       }
                       required
@@ -266,18 +418,71 @@ export default function Customers() {
 
             <div className="flex gap-3 mt-6">
               <Button
-                onClick={() => setShowAddCustomer(false)}
+                onClick={() => {
+                  setShowAddCustomer(false);
+                  setFormData({
+                    clientName: "",
+                    clientEmail: "",
+                    clientRemarks: "",
+                  });
+                }}
                 variant="outline"
                 className="flex-1"
               >
                 Cancel
               </Button>
               <Button
-                onClick={() => {}}
-                disabled={!formData.clientEmail || !formData.clientEmail}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                onClick={createCustomer}
+                disabled={!formData.clientEmail}
+                className={`flex-1 ${
+                  addingCustomer
+                    ? "bg-blue-800"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }`}
               >
-                Add Customer
+                {addingCustomer ? (
+                  <div className="flex gap-1 items-center">
+                    <Loader2 className="animate-spin" /> Adding Customer...
+                  </div>
+                ) : (
+                  <div className="flex gap-1 items-center">
+                    <UserPlus2 /> Add Customer
+                  </div>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/** Link modal */}
+      {makingLinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
+            <h2 className="text-2xl font-bold mb-3 text-gray-900">
+              Making enrollment link
+            </h2>
+
+            {enrollMessage.length > 0 && (
+              <div className="mb-4 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm">
+                <p>{enrollMessage}</p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              Name: {enrollName} <br />
+              Email: {enrollEmail}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button
+                onClick={() => {
+                  setMakingLinkModal(false);
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
               </Button>
             </div>
           </div>

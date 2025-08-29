@@ -1,15 +1,27 @@
 import { getStripe } from "@/lib/clients/stripe/server";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req) {
-  const { name, email } = await req.json();
+  const { name, email, remarks } = await req.json();
 
   try {
+    const existingCustomer = await prisma.customer.findUnique({
+      where: { email },
+    });
+
+    if (existingCustomer) {
+      return new Response(
+        JSON.stringify({ error: "Customer already exists with the email!" }),
+        { status: 409 }
+      );
+    }
+
     const stripe = getStripe();
     const customer = await stripe.customers.create({ name, email });
 
     if (!customer?.id || !customer.id.startsWith("cus_")) {
       return new Response(
-        JSON.stringify({ error: "Invalid customer response from Stripe" }),
+        JSON.stringify({ error: "Invalid customer response from Stripe!" }),
         { status: 400 }
       );
     }
@@ -47,19 +59,23 @@ export async function POST(req) {
      * 
      */
 
-    const dbCustomer = {
-      customer_id: customer.id,
-      name: customer.name || null,
-      email: customer.email || null
-    };
+    const stripeCustomerName = customer.name;
+    const stripeCustomerEmail = customer.email;
+    const stripeCustomerId = customer.id;
 
-    console.log("DB-Ready Customer:", dbCustomer);
+    const dbCustomer = await prisma.customer.create({
+      data: {
+        name: stripeCustomerName,
+        email: stripeCustomerEmail,
+        remarks: remarks,
+        stripeCustomerId: stripeCustomerId,
+      },
+    });
 
-
-    
     return new Response(
       JSON.stringify({
         customer: dbCustomer,
+        status: "Customer is added!",
       }),
       { status: 200 }
     );
