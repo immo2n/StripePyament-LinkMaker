@@ -32,6 +32,7 @@ export async function GET(req) {
         remarks: true,
         stripeCustomerId: true,
         createdAt: true,
+        paymentEnrolled: true,
       },
     });
 

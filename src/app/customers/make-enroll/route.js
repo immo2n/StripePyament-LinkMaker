@@ -1,5 +1,6 @@
 import { getStripe } from "@/lib/clients/stripe/server";
 import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
 
 export async function POST(req) {
   const { customerId, email } = await req.json();
@@ -31,16 +32,20 @@ export async function POST(req) {
       },
     });
 
+    const hash = crypto.randomBytes(20).toString("hex");
+
     if (setupIntent.client_secret) {
+      const now = new Date();
       await prisma.customer.update({
         where: { email },
         data: {
           enrollmentSecret: setupIntent.client_secret,
+          enrollmentLinkHash: hash,
+          enrollHashTimestamp: now,
         },
       });
-    }
-    else {
-        return new Response(
+    } else {
+      return new Response(
         JSON.stringify({ error: "Failed to make enrollment intent!" }),
         {
           status: 400,
@@ -51,7 +56,7 @@ export async function POST(req) {
     return new Response(
       JSON.stringify({
         status: true,
-        link: "https://google.com",
+        enrollHash: hash,
       }),
       {
         status: 200,

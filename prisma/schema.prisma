@@ -15,13 +15,18 @@ datasource db {
 }
 
 model Customer {
-  id               Int      @id @default(autoincrement())
-  name             String
-  email            String   @unique
-  remarks          String   @db.VarChar(250)
-  stripeCustomerId String
-  enrollmentSecret String?  @db.VarChar(1000)
-  paymentSecret    String?  @db.VarChar(1000)
-  createdAt        DateTime @default(now())
+  id                  Int      @id @default(autoincrement())
+  name                String
+  email               String   @unique
+  remarks             String   @db.VarChar(250)
+  stripeCustomerId    String
+  enrollmentSecret    String?  @db.VarChar(1000)
+  paymentSecret       String?  @db.VarChar(1000)
+  enrollmentLinkHash  String? @unique @db.VarChar(1000)
+  paymentLinkHash     String? @unique @db.VarChar(1000)
+  enrollHashTimestamp DateTime?
+  paymentHashTimestamp DateTime?
+  createdAt           DateTime @default(now())
+  paymentEnrolled     Boolean  @default(false)
 }
 

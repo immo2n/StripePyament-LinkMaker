@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Copy,
   LayoutDashboard,
   Loader2,
   MessageCircle,
@@ -82,6 +83,7 @@ export default function Customers() {
 
   const [modalMessage, setModalMessage] = useState("");
   const [addingCustomer, setAddingCustomer] = useState(false);
+  const [enrollHash, setEnrollHash] = useState(null);
 
   async function createCustomer() {
     if (addingCustomer) return;
@@ -112,6 +114,7 @@ export default function Customers() {
         console.log("Customer created successfully:", data.customer);
         setModalMessage(data.status || "Customer created successfully!");
 
+        fetchCustomers(1);
         setShowAddCustomer(false);
         setFormData({
           clientName: "",
@@ -140,26 +143,30 @@ export default function Customers() {
   async function makeEnrollmentLink(customer) {
     if (makingLinkModal) return;
     setMakingLinkModal(true);
+    setEnrollHash(null);
     setEnrollMessage("Making enrollment link for user...");
 
     const id = customer.stripeCustomerId;
     setEnrollName(customer.name);
     setEnrollEmail(customer.email);
 
-    const res = await fetch("/customers/enroll", {
+    const res = await fetch("/customers/make-enroll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         customerId: id,
-        email: customer.email
+        email: customer.email,
       }),
     });
     const data = await res.json();
     setEnrollMessage("");
     switch (res.status) {
       case 200:
-        console.log(data);
-
+        if (data.enrollHash) {
+          setEnrollHash(data.enrollHash);
+        } else {
+          setEnrollMessage("Server error, try again!");
+        }
         break;
       case 500:
       case 400:
@@ -265,28 +272,9 @@ export default function Customers() {
               {query.trim().length > 0 ? " for: " + query : ""}
             </div>
           ) : (
-            <table className="w-full border-collapse">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
-                    #SL
-                  </th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
-                    Name
-                  </th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
-                    Email
-                  </th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
-                    Remarks
-                  </th>
-                  <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((customer, index) => (
+            <tbody>
+              {customers.length > 0 ? (
+                customers.map((customer, index) => (
                   <tr
                     key={customer.id}
                     className="border-b last:border-none hover:bg-gray-50"
@@ -297,24 +285,37 @@ export default function Customers() {
                     <td className="px-4 py-3 text-sm">{customer.name}</td>
                     <td className="px-4 py-3 text-sm">{customer.email}</td>
                     <td className="px-4 py-3 text-sm">
+                      {customer.paymentEnrolled ? (
+                        <span className="text-green-700">Yes</span>
+                      ) : (
+                        <span className="text-red-500">No</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
                       {customer.remarks ? (
                         customer.remarks
                       ) : (
-                        <span className="font-gray-500">N/A</span>
+                        <span className="text-gray-500">N/A</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <Button
                         onClick={() => makeEnrollmentLink(customer)}
-                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white hover:text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
                       >
-                        <PlusCircle /> Add Pyament Method
+                        <PlusCircle /> Add Payment Method
                       </Button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="text-center py-5 text-gray-500 px-5">
+                    No customers found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
           )}
         </div>
 
@@ -473,6 +474,37 @@ export default function Customers() {
               Name: {enrollName} <br />
               Email: {enrollEmail}
             </div>
+            {enrollHash && enrollHash.length > 0 && (
+              <>
+                <div className="mt-5 mb-5 relative">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${
+                      typeof window !== "undefined"
+                        ? window.location.origin
+                        : ""
+                    }/customers/enroll/${enrollHash}`}
+                    onClick={(e) => e.target.select()} // auto-select text
+                    className="w-full pr-10 p-3 rounded-lg border border-green-300 bg-green-50 text-green-900 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 cursor-pointer"
+                  />
+                  <Copy
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer text-green-600 hover:text-green-800"
+                    size={18}
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}/customers/enroll/${enrollHash}`
+                      );
+                      setEnrollMessage("Copied to clipboard!");
+                    }}
+                  />
+                </div>
+                <div className="text-sm">
+                  Share this link with the user so they can enroll their payment
+                  method, valid for 30 minutes from creation.
+                </div>
+              </>
+            )}
 
             <div className="flex gap-3 mt-6">
               <Button
