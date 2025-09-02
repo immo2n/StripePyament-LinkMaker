@@ -264,7 +264,6 @@ export default function Customers() {
           </div>
         </div>
 
-        {/** Customers List */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           {loading ? (
             <div className="p-4 text-center text-gray-500">
@@ -272,50 +271,77 @@ export default function Customers() {
               {query.trim().length > 0 ? " for: " + query : ""}
             </div>
           ) : (
-            <tbody>
-              {customers.length > 0 ? (
-                customers.map((customer, index) => (
-                  <tr
-                    key={customer.id}
-                    className="border-b last:border-none hover:bg-gray-50"
-                  >
-                    <td className="px-4 py-3 text-sm">
-                      {(currentPage - 1) * itemsPerPage + (index + 1)}
-                    </td>
-                    <td className="px-4 py-3 text-sm">{customer.name}</td>
-                    <td className="px-4 py-3 text-sm">{customer.email}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {customer.paymentEnrolled ? (
-                        <span className="text-green-700">Yes</span>
-                      ) : (
-                        <span className="text-red-500">No</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {customer.remarks ? (
-                        customer.remarks
-                      ) : (
-                        <span className="text-gray-500">N/A</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <Button
-                        onClick={() => makeEnrollmentLink(customer)}
-                        className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-                      >
-                        <PlusCircle /> Add Payment Method
-                      </Button>
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
+                    #
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
+                    Name
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
+                    Email
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
+                    Payment Enrolled
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
+                    Remarks
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers.length > 0 ? (
+                  customers.map((customer, index) => (
+                    <tr
+                      key={customer.id}
+                      className="border-b last:border-none hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-3 text-sm">
+                        {(currentPage - 1) * itemsPerPage + (index + 1)}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{customer.name}</td>
+                      <td className="px-4 py-3 text-sm">{customer.email}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {customer.paymentEnrolled ? (
+                          <span className="text-green-700">Yes</span>
+                        ) : (
+                          <span className="text-red-500">No</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {customer.remarks ? (
+                          customer.remarks
+                        ) : (
+                          <span className="text-gray-500">N/A</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <Button
+                          onClick={() => makeEnrollmentLink(customer)}
+                          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                        >
+                          <PlusCircle /> Add Payment Method
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="text-center py-5 text-gray-500 px-5"
+                    >
+                      No customers found.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="text-center py-5 text-gray-500 px-5">
-                    No customers found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
+                )}
+              </tbody>
+            </table>
           )}
         </div>
 
