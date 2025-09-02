@@ -63,7 +63,9 @@ jobs:
             set +a
 
             # Stop old PM2 process if running
-            pm2 stop diligent_app || true
+            if pm2 list | grep -q diligent_app; then
+              pm2 delete diligent_app
+            fi
 
             # Start/restart Next.js with production variables
             PORT=3000 NODE_ENV=production pm2 start npm --name "diligent_app" -- start
