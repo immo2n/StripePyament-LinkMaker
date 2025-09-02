@@ -65,6 +65,7 @@ export async function POST(request: Request) {
 
 		console.log("4. Calling Stripe API...");
 		const paymentIntent = await stripe.paymentIntents.create({
+			customer: "cus_SxP9s4n7t4Rmgv",
 			amount: amountInCents,
 			currency: "usd",
 			automatic_payment_methods: {

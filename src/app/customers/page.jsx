@@ -23,6 +23,7 @@ export default function Customers() {
   const itemsPerPage = 15;
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [authinticated, setAuthinticated] = useState(false);
 
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
@@ -32,6 +33,17 @@ export default function Customers() {
 
     return () => clearTimeout(delayDebounce);
   }, [query]);
+
+
+  useEffect(() => {
+    const authToken = localStorage.getItem("adminAuth");
+    if (authToken !== "true") {
+      window.location.href = "/login";
+    }
+    else {
+      setAuthinticated(true);
+    }
+  }, []);
 
   async function fetchCustomers(page = 1, query = "") {
     setLoading(true);
@@ -181,6 +193,7 @@ export default function Customers() {
   const [enrollEmail, setEnrollEmail] = useState("N/A");
   const [enrollMessage, setEnrollMessage] = useState("");
 
+  if(!authinticated) return null;
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-cyan-50">
       {/** Header */}

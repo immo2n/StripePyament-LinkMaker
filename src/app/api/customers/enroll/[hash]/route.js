@@ -8,7 +8,7 @@ export async function GET(req, { params }) {
     return NextResponse.json({ error: "Invalid link" }, { status: 400 });
   }
 
-  const expirationThreshold = new Date(Date.now() - 30 * 60 * 1000);
+  const expirationThreshold = new Date(Date.now() - 60 * 60 * 1000);
 
   const customer = await prisma.customer.findFirst({
     where: {
