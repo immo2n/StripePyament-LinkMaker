@@ -26,7 +26,7 @@ interface PaymentLink {
   link: string;
 }
 
-export default function AdminPage() {
+export default function AdminPageOld() {
   const { showToast } = useToast();
   const [paymentLinks, setPaymentLinks] = useState<PaymentLink[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
