@@ -14,7 +14,7 @@ jobs:
 
       - name: 📦 Create tarball
         run: |
-          tar -czf diligent.tar.gz .
+          tar --exclude='.git' --exclude='.github' -czf diligent.tar.gz .
 
       - name: 📤 Copy tarball to EC2
         uses: appleboy/scp-action@v0.1.7
