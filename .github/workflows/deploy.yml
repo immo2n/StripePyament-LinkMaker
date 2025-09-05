@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout code
+      - name: 📥 Checkout latest code
         uses: actions/checkout@v4
 
       - name: 📦 Prepare and create tarball
@@ -40,10 +40,20 @@ jobs:
               sudo npm install -g pm2
             fi
 
-            echo "📂 Extracting tarball..."
+            echo "🧹 Cleaning old deployment (preserving .env)..."
+            if [ -f /home/ubuntu/diligent/.env ]; then
+              cp /home/ubuntu/diligent/.env /home/ubuntu/.env_backup
+            fi
+            rm -rf /home/ubuntu/diligent
+
+            echo "📂 Extracting new code..."
             mkdir -p /home/ubuntu/diligent
             tar -xzf /home/ubuntu/diligent.tar.gz -C /home/ubuntu/diligent
             rm /home/ubuntu/diligent.tar.gz
+
+            if [ -f /home/ubuntu/.env_backup ]; then
+              mv /home/ubuntu/.env_backup /home/ubuntu/diligent/.env
+            fi
 
             echo "📂 Installing dependencies, generating Prisma client & building app..."
             cd /home/ubuntu/diligent
@@ -56,10 +66,8 @@ jobs:
             source /home/ubuntu/diligent/.env
             set +a
 
-            # Stop and delete old PM2 process if exists
+            echo "🔄 Restarting PM2..."
             pm2 delete diligent_app || true
-
-            # Start/restart Next.js with production variables
             PORT=3000 NODE_ENV=production pm2 start npm --name "diligent_app" -- start
 
             echo "⌚ Waiting for the service to start..."
