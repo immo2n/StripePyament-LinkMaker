@@ -12,9 +12,10 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: 📦 Create tarball using git archive
+      - name: 📦 Prepare and create tarball
         run: |
-          git archive --format=tar.gz -o diligent.tar.gz HEAD
+          rm -rf .git
+          tar --warning=no-file-changed --ignore-failed-read -czf diligent.tar.gz .
 
       - name: 📤 Copy tarball to EC2
         uses: appleboy/scp-action@v0.1.7
