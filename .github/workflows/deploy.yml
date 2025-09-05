@@ -12,14 +12,18 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: 📤 Copy code to EC2
+      - name: 📦 Create tarball
+        run: |
+          tar -czf diligent.tar.gz .
+
+      - name: 📤 Copy tarball to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "."
-          target: "/home/ubuntu/diligent"
+          source: "diligent.tar.gz"
+          target: "/home/ubuntu/"
 
       - name: 🚀 Deploy & Build on EC2
         uses: appleboy/ssh-action@v1.0.0
@@ -34,6 +38,11 @@ jobs:
               sudo apt-get install -y nodejs
               sudo npm install -g pm2
             fi
+
+            echo "📂 Extracting tarball..."
+            mkdir -p /home/ubuntu/diligent
+            tar -xzf /home/ubuntu/diligent.tar.gz -C /home/ubuntu/diligent
+            rm /home/ubuntu/diligent.tar.gz
 
             echo "📂 Installing dependencies, generating Prisma client & building app..."
             cd /home/ubuntu/diligent
