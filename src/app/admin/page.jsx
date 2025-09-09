@@ -402,7 +402,7 @@ export default function AdminPage() {
                           <div className="text-sm font-semibold text-gray-900 mb-1">
                             {link.itineraryUrl && (
                               <ItineraryCell
-                                itineraryUrl={"/api/" + link.itineraryUrl}
+                                itineraryUrl={link.itineraryUrl}
                               />
                             )}
                           </div>
