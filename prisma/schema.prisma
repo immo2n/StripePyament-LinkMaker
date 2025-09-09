@@ -25,3 +25,16 @@ model Customer {
   paymentEnrolled     Boolean  @default(false)
 }
 
+model PaymentLink {
+  id              Int       @id @default(autoincrement())
+  customerId      Int?
+  amount          Float
+  refundable      Boolean
+  clientName      String?
+  clientEmail     String?
+  itineraryUrl    String
+  stripeSecret    String?
+  paymentLinkHash String    @unique @db.VarChar(1000)
+  successful      Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+}

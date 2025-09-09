@@ -10,6 +10,7 @@ import { User2 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import ItineraryCell from "@/components/ItineraryCell";
 
 export default function AdminPage() {
   const [links, setLinks] = useState([]);
@@ -20,6 +21,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [creatingLink, setCreatingLink] = useState(false);
 
   const [showSettings, setShowSettings] = useState(false);
 
@@ -30,9 +33,9 @@ export default function AdminPage() {
   });
 
   const [formData, setFormData] = useState({
-    service: "",
-    reason: "",
     amount: "",
+    itinerary: "",
+    refundable: false,
     clientName: "",
     clientEmail: "",
   });
@@ -152,7 +155,7 @@ export default function AdminPage() {
     if (!confirm("Are you sure you want to delete this link?")) return;
 
     try {
-      const res = await fetch(`/links/delete/${linkId}`, {
+      const res = await fetch(`/admin/delete-links/${linkId}`, {
         method: "DELETE",
       });
 
@@ -163,6 +166,65 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error("Delete link error:", error);
+    }
+  }
+
+  function handleFileUpload(file) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setFormData({ ...formData, itinerary: ev.target.result });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function createPaymentLink() {
+    if (
+      !formData.amount ||
+      isNaN(formData.amount) ||
+      Number(formData.amount) <= 0
+    ) {
+      showToast("Please enter a valid payment amount!", "error");
+      return;
+    }
+
+    if (formData.refundable === undefined || formData.refundable === null) {
+      showToast("Please select whether the payment is refundable.", "error");
+      return;
+    }
+
+    if (!formData.itinerary) {
+      showToast("Please attach or paste an itinerary image.", "error");
+      return;
+    }
+
+    const formDataToSend = new FormData();
+    formDataToSend.append("amount", formData.amount);
+    formDataToSend.append("refundable", formData.refundable);
+    formDataToSend.append("clientName", formData.clientName);
+    formDataToSend.append("clientEmail", formData.clientEmail);
+    formDataToSend.append("itinerary", formData.itinerary);
+
+    setCreatingLink(true);
+    try {
+      const response = await fetch("/admin/api/payment-links", {
+        method: "POST",
+        body: formDataToSend,
+      });
+
+      const result = await response.json();
+      setCreatingLink(false);
+
+      if (!response.ok) {
+        showToast(result.error || "Failed to create payment link.", "error");
+        return;
+      }
+
+      showToast("Payment link created successfully!", "success");
+      console.log(result);
+      fetchLinks(1);
+      setShowCreateForm(false);
+    } catch (error) {
+      showToast("Failed to create payment link. Please try again.", "error");
     }
   }
 
@@ -335,10 +397,11 @@ export default function AdminPage() {
                       <td className="px-8 py-6">
                         <div className="max-w-xs">
                           <div className="text-sm font-semibold text-gray-900 mb-1">
-                            {link.service || "N/A"}
-                          </div>
-                          <div className="text-sm text-gray-500 truncate">
-                            {link.reason || "—"}
+                            {link.itineraryUrl && (
+                              <ItineraryCell
+                                itineraryUrl={link.itineraryUrl}
+                              />
+                            )}
                           </div>
                         </div>
                       </td>
@@ -507,119 +570,183 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-
       {/* Create Form Modal */}
+
       {showCreateForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 max-h-[80vh] flex flex-col">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900">
               Create Payment Link
             </h2>
 
-            <div className="space-y-4">
-              {/* Required Fields */}
-              <div className="border-b border-gray-200 pb-4 mb-4">
-                <h3 className="text-sm font-medium text-gray-900 mb-3">
-                  Required Information
-                </h3>
+            {/* Scrollable body */}
+            <div className="overflow-y-auto flex-1 pr-2">
+              <div className="space-y-4">
+                {/* Required Fields */}
+                <div className="border-b border-gray-200 pb-4 mb-4">
+                  <h3 className="text-sm font-medium text-gray-900 mb-3">
+                    Required Information
+                  </h3>
+                  <div className="space-y-3">
+                    {/* Amount */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Amount ($) *
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="1500.00"
+                        value={formData.amount}
+                        onChange={(e) =>
+                          setFormData({ ...formData, amount: e.target.value })
+                        }
+                        step="0.01"
+                        min="1"
+                        required
+                      />
+                    </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Service Description *
-                    </label>
-                    <Input
-                      placeholder="Website Development, Logo Design, Consulting..."
-                      value={formData.service}
-                      onChange={(e) =>
-                        setFormData({ ...formData, service: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
+                    {/* Itinerary Upload/Paste/DragDrop */}
+                    <div
+                      tabIndex={0}
+                      className={`border-2 border-dashed rounded-lg p-4 text-center relative transition-colors ${
+                        isFocused ? "border-blue-500" : "border-gray-300"
+                      }`}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const file = e.dataTransfer.files[0];
+                        if (file) handleFileUpload(file);
+                      }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onPaste={(e) => {
+                        const item = [...e.clipboardData.items].find(
+                          (i) => i.type.indexOf("image") !== -1
+                        );
+                        if (item) {
+                          const file = item.getAsFile();
+                          handleFileUpload(file);
+                        }
+                      }}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => setIsFocused(false)}
+                    >
+                      <p className="text-sm text-gray-600 mb-2">
+                        Drag & drop, paste screenshot (Ctrl+V), or{" "}
+                        <button
+                          type="button"
+                          className="text-blue-600 underline"
+                          onClick={() =>
+                            document.getElementById("fileInput").click()
+                          }
+                        >
+                          browse files
+                        </button>
+                      </p>
+                      <input
+                        id="fileInput"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload(file);
+                        }}
+                        className="hidden"
+                      />
+                      {formData.itinerary ? (
+                        <div className="relative mt-2">
+                          <img
+                            src={formData.itinerary}
+                            alt="Itinerary Preview"
+                            className="rounded-lg border w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
+                            onClick={() =>
+                              setFormData({ ...formData, itinerary: "" })
+                            }
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Payment Reason *
-                    </label>
-                    <textarea
-                      placeholder="Final payment for project completion, Monthly retainer..."
-                      value={formData.reason}
-                      onChange={(e) =>
-                        setFormData({ ...formData, reason: e.target.value })
-                      }
-                      className="w-full h-20 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Amount ($) *
-                    </label>
-                    <Input
-                      type="number"
-                      placeholder="1500.00"
-                      value={formData.amount}
-                      onChange={(e) =>
-                        setFormData({ ...formData, amount: e.target.value })
-                      }
-                      step="0.01"
-                      min="1"
-                      required
-                    />
+                    {/* Refundable Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Is Payment Refundable? *
+                      </label>
+                      <select
+                        value={
+                          formData.refundable === undefined
+                            ? "no"
+                            : formData.refundable
+                            ? "yes"
+                            : "no"
+                        }
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            refundable: e.target.value === "yes",
+                          })
+                        }
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      >
+                        <option value="no">Non-Refundable</option>
+                        <option value="yes">Refundable</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Optional Fields */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3">
-                  Client Information (Optional)
-                </h3>
-                <p className="text-xs text-gray-500 mb-3">
-                  Add client details for better organization and personalized
-                  checkout experience
-                </p>
+                {/* Optional Fields */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900 mb-3">
+                    Customer Information (Optional)
+                  </h3>
 
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Client Name
-                    </label>
-                    <Input
-                      placeholder="John Doe (optional)"
-                      value={formData.clientName}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          clientName: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Customer Name
+                      </label>
+                      <Input
+                        placeholder="John Doe"
+                        value={formData.clientName}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            clientName: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Client Email
-                    </label>
-                    <Input
-                      type="email"
-                      placeholder="john@example.com (optional)"
-                      value={formData.clientEmail}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          clientEmail: e.target.value,
-                        })
-                      }
-                    />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Customer Email
+                      </label>
+                      <Input
+                        type="email"
+                        placeholder="john@example.com"
+                        value={formData.clientEmail}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            clientEmail: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
+            {/* Buttons */}
+            <div className="flex gap-3 mt-4">
               <Button
                 onClick={() => setShowCreateForm(false)}
                 variant="outline"
@@ -628,11 +755,16 @@ export default function AdminPage() {
                 Cancel
               </Button>
               <Button
-                onClick={()=>{}}
-                disabled={!formData.service || !formData.amount}
+                onClick={() => createPaymentLink()}
+                disabled={
+                  creatingLink ||
+                  !formData.amount ||
+                  !formData.itinerary ||
+                  formData.refundable === undefined
+                }
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
               >
-                Generate Link
+                {creatingLink ? "Creating..." : "Create Link"}
               </Button>
             </div>
           </div>
