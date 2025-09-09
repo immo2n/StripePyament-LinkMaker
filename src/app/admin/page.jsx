@@ -32,6 +32,8 @@ export default function AdminPage() {
     confirmPassword: "",
   });
 
+
+  const [itinaryBase64, setItinaryBase64] = useState(null);
   const [formData, setFormData] = useState({
     amount: "",
     itinerary: "",
@@ -172,7 +174,8 @@ export default function AdminPage() {
   function handleFileUpload(file) {
     const reader = new FileReader();
     reader.onload = (ev) => {
-      setFormData({ ...formData, itinerary: ev.target.result });
+      setItinaryBase64(ev.target.result);
+      setFormData({ ...formData, itinerary: file });
     };
     reader.readAsDataURL(file);
   }
@@ -652,10 +655,10 @@ export default function AdminPage() {
                         }}
                         className="hidden"
                       />
-                      {formData.itinerary ? (
+                      {itinaryBase64 ? (
                         <div className="relative mt-2">
                           <img
-                            src={formData.itinerary}
+                            src={itinaryBase64}
                             alt="Itinerary Preview"
                             className="rounded-lg border w-full object-cover"
                           />
