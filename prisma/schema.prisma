@@ -34,6 +34,7 @@ model PaymentLink {
   clientEmail     String?
   itineraryUrl    String
   stripeSecret    String?
+  stripeIntentId  String?  @db.VarChar(255)
   paymentLinkHash String    @unique @db.VarChar(1000)
   successful      Boolean   @default(false)
   createdAt       DateTime  @default(now())

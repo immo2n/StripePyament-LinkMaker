@@ -9,29 +9,9 @@ import {
 } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
 import { getStripe } from "@/lib/clients/stripe/browser";
-import { CheckoutFormSkeleton } from "./checkout-form-skeleton";
 import { Input } from "@/components/ui/input";
-import { api } from "@/lib/utils";
-import axios from "axios";
 
-async function createPaymentIntent(amount: number, paymentLinkId?: string) {
-	try {
-		const response = await api.post("/payments/create-payment-intent", {
-			amount,
-			paymentLinkId,
-		});
-		return response.data;
-	} catch (error) {
-		if (axios.isAxiosError(error)) {
-			throw new Error(
-				error.response?.data?.error || "Failed to create payment intent"
-			);
-		}
-		throw error;
-	}
-}
-
-function CheckoutForm({ amount, paymentLinkId }: { amount: number; paymentLinkId?: string }) {
+function CheckoutForm({ clientSecret }: { clientSecret: string }) {
 	const [cardholderName, setCardholderName] = React.useState<string>("");
 	const [cardholderEmail, setCardholderEmail] = React.useState<string>("");
 	const [paymentType, setPaymentType] = React.useState<string>("");
@@ -73,8 +53,6 @@ function CheckoutForm({ amount, paymentLinkId }: { amount: number; paymentLinkId
 		setPaymentStatus("processing");
 
 		try {
-			const { clientSecret } = await createPaymentIntent(amount, paymentLinkId);
-
 			const { error: submitError } = await elements.submit();
 			if (submitError) throw submitError;
 
@@ -146,7 +124,7 @@ function CheckoutForm({ amount, paymentLinkId }: { amount: number; paymentLinkId
 	);
 }
 
-export function StripeCheckoutForm({ amount, paymentLinkId }: { amount: number; paymentLinkId?: string }) {
+export function StripeCheckoutForm({ amount, clientSecret }: { amount: number; clientSecret: string }) {
 	return (
 		<Elements
 			stripe={getStripe()}
@@ -162,7 +140,7 @@ export function StripeCheckoutForm({ amount, paymentLinkId }: { amount: number; 
 					},
 				},
 			}}>
-			<CheckoutForm amount={amount} paymentLinkId={paymentLinkId} />
+			<CheckoutForm clientSecret={clientSecret} />
 		</Elements>
 	);
 }

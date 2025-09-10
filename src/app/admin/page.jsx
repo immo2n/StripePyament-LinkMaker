@@ -32,7 +32,6 @@ export default function AdminPage() {
     confirmPassword: "",
   });
 
-
   const [itinaryBase64, setItinaryBase64] = useState(null);
   const [formData, setFormData] = useState({
     amount: "",
@@ -227,6 +226,7 @@ export default function AdminPage() {
       fetchLinks(1);
       setShowCreateForm(false);
     } catch (error) {
+      setCreatingLink(false);
       showToast("Failed to create payment link. Please try again.", "error");
     }
   }
@@ -260,7 +260,17 @@ export default function AdminPage() {
             </div>
             <div className="flex items-center space-x-3">
               <Button
-                onClick={() => setShowCreateForm(true)}
+                onClick={() => {
+                  setFormData({
+                    amount: "",
+                    itinerary: "",
+                    refundable: false,
+                    clientName: "",
+                    clientEmail: "",
+                  });
+                  setItinaryBase64(null);
+                  setShowCreateForm(true);
+                }}
                 className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -365,6 +375,9 @@ export default function AdminPage() {
                       📅 Created
                     </th>
                     <th className="px-8 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                      ℹ️ Status
+                    </th>
+                    <th className="px-8 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                       ⚡ Actions
                     </th>
                   </tr>
@@ -401,9 +414,7 @@ export default function AdminPage() {
                         <div className="max-w-xs">
                           <div className="text-sm font-semibold text-gray-900 mb-1">
                             {link.itineraryUrl && (
-                              <ItineraryCell
-                                itineraryUrl={link.itineraryUrl}
-                              />
+                              <ItineraryCell itineraryUrl={link.itineraryUrl} />
                             )}
                           </div>
                         </div>
@@ -415,15 +426,35 @@ export default function AdminPage() {
                       <td className="px-8 py-6 text-sm text-gray-500 font-medium">
                         {new Date(link.createdAt).toLocaleString()}
                       </td>
+
+                      <td className="px-8 py-6 text-sm font-medium">
+                        {link.successful ? (
+                          <span className="px-3 py-1 rounded-full text-green-700 bg-green-100">
+                            Completed
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 rounded-full text-yellow-700 bg-yellow-100">
+                            Pending
+                          </span>
+                        )}
+                      </td>
+
                       <td className="px-8 py-6 text-sm font-medium">
                         <div className="flex space-x-2">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() =>
-                              navigator.clipboard.writeText(
-                                `${window.location.origin}/pay/${link.hash}`
-                              )
+                              navigator.clipboard
+                                .writeText(
+                                  `${window.location.origin}/pay/${link.paymentLinkHash}`
+                                )
+                                .then(() => {
+                                  showToast("Link copied to clipboard", "success");
+                                })
+                                .catch(() => {
+                                  showToast("Failed to copy", "error");
+                                })
                             }
                             className="bg-white/80 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 hover:shadow-md transform hover:scale-105 transition-all duration-200"
                           >

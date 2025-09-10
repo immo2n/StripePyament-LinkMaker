@@ -1,10 +1,10 @@
-// app/admin/api/payment-links/route.js
 import { NextResponse } from "next/server";
 import { mkdir } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
+import { stripe } from "@/lib/clients/stripe/server";
 
 export async function POST(req) {
   try {
@@ -36,13 +36,32 @@ export async function POST(req) {
 
     // Compress & save as JPEG 90%
     const buffer = Buffer.from(await itineraryFile.arrayBuffer());
-    await sharp(buffer)
-      .jpeg({ quality: 90 })
-      .toFile(filePath);
+    await sharp(buffer).jpeg({ quality: 90 }).toFile(filePath);
 
     // Generate hashes/secrets
     const paymentLinkHash = crypto.randomBytes(12).toString("hex");
-    const stripeSecret = crypto.randomBytes(16).toString("hex");
+    const amountInCents = Math.round(amount * 100);
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency: "usd",
+      automatic_payment_methods: {
+        enabled: true,
+      },
+      metadata: {
+        custom_amount: amount.toString(),
+        payment_link_id: paymentLinkHash,
+      },
+    });
+
+    if (!paymentIntent.id || !paymentIntent.client_secret) {
+      return NextResponse.json({ error: "Stripe error" }, { status: 500 });
+    }
+
+    console.log("Stripe PaymentIntent created successfully:", paymentIntent.id);
+    console.log("Stripe PaymentIntent created successfully:", paymentIntent.client_secret);
+    const stripeSecret = paymentIntent.client_secret;
+    const stripeIntentId = paymentIntent.id;
 
     // Save to database
     const paymentLink = await prisma.paymentLink.create({
@@ -55,6 +74,7 @@ export async function POST(req) {
         itineraryUrl: `/uploads/${fileName}`,
         paymentLinkHash,
         stripeSecret,
+        stripeIntentId
       },
     });
 
