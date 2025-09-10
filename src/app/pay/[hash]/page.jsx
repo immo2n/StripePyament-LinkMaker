@@ -1,114 +1,163 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { prisma } from "@/lib/prisma";
+import {
+  User,
+  EnvelopeSimple,
+  ArrowClockwise,
+  Calendar,
+  Shield,
+  Lock,
+} from "@phosphor-icons/react/dist/ssr";
 import { StripeCheckoutForm } from "@/features/billing/components/checkout-form";
+import { stripe } from "@/lib/clients/stripe/server";
 
-export default function PayPage({ params: promisedParams }) {
-  const [params, setParams] = useState(null);
-  const [clientSecret, setClientSecret] = useState(null);
-  const [paymentLink, setPaymentLink] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+function PaymentSummary({ paymentLink }) {
+  const {
+    clientName,
+    clientEmail,
+    amount,
+    refundable,
+    itineraryUrl,
+    createdAt,
+  } = paymentLink;
 
-  useEffect(() => {
-    promisedParams
-      .then(setParams)
-      .catch(() => setError("Failed to get params"));
-  }, [promisedParams]);
+  return (
+    <div className="w-full max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden p-6 space-y-6">
+      {/* Itinerary */}
+      <div className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
+        <img
+          src={itineraryUrl}
+          alt="Itinerary"
+          className="w-full h-64 object-cover transform hover:scale-105 transition-transform duration-300"
+        />
+      </div>
 
-  useEffect(() => {
-    if (!params) return;
-    const { hash } = params;
-
-    async function fetchPayment() {
-      try {
-        const res = await fetch("/api/pay", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paymentLinkHash: hash }),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          setError(errData.error || "Failed to fetch payment link");
-          return;
-        }
-        const data = await res.json();
-        setPaymentLink(data.paymentLink);
-        setClientSecret(data.clientSecret);
-      } catch {
-        setError("Server error");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchPayment();
-  }, [params]);
-
-  function PaymentSummary({ paymentLink }) {
-    const {
-      clientName,
-      clientEmail,
-      amount,
-      refundable,
-      itineraryUrl,
-      createdAt,
-    } = paymentLink;
-
-    return (
-      <div className="w-full max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden p-6 space-y-6">
-        <div className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
-          <img
-            src={itineraryUrl}
-            alt="Itinerary"
-            className="w-full h-64 object-cover transform hover:scale-105 transition-transform duration-300"
-          />
+      {/* Customer Info */}
+      {clientName && clientEmail && (
+        <div className="border-b pb-4 space-y-2">
+          <h3 className="text-lg font-semibold text-gray-800">Customer</h3>
+          <p className="text-gray-700 flex items-center">
+            <User className="w-4 h-4 mr-2 text-gray-500" /> {clientName}
+          </p>
+          <p className="text-gray-700 flex items-center">
+            <EnvelopeSimple className="w-4 h-4 mr-2 text-gray-500" />{" "}
+            {clientEmail}
+          </p>
         </div>
-        {clientName && clientEmail && (
-          <div className="border-b pb-4 space-y-2">
-            <h3 className="text-lg font-semibold text-gray-800">Customer</h3>
-            <p className="text-gray-700">{clientName}</p>
-            <p className="text-gray-700">{clientEmail}</p>
-          </div>
-        )}
-        <div className="border-b pb-4 space-y-3">
-          <h3 className="text-lg font-semibold text-gray-800">Payment Info</h3>
-          <div className="flex justify-between items-center">
-            <span className="text-gray-600 font-medium">Amount</span>
-            <span className="text-xl font-bold text-gray-900">
-              ${amount.toFixed(2)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-gray-600 font-medium">Refundable</span>
-            <span
-              className={`px-2 py-1 rounded-full text-sm font-semibold ${
-                refundable
-                  ? "bg-green-100 text-green-700"
-                  : "bg-red-100 text-red-700"
-              }`}
-            >
-              {refundable ? "Yes" : "No"}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-gray-600 font-medium">Created</span>
-            <span className="text-gray-700 text-sm">
-              {new Date(createdAt).toLocaleString()}
-            </span>
-          </div>
+      )}
+
+      {/* Payment Info */}
+      <div className="border-b pb-4 space-y-3">
+        <h3 className="text-lg font-semibold text-gray-800">Payment Info</h3>
+
+        <div className="flex justify-between items-center">
+          <span className="text-gray-600 font-medium">Amount</span>
+          <span className="text-xl font-bold text-gray-900">
+            ${amount.toFixed(2)}
+          </span>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span className="flex items-center text-gray-600 font-medium">
+            Refundable <ArrowClockwise className="w-4 h-4 ml-1 text-gray-500" />
+          </span>
+          <span
+            className={`px-2 py-1 rounded-full text-sm font-semibold ${
+              refundable
+                ? "bg-green-100 text-green-700"
+                : "bg-red-100 text-red-700"
+            }`}
+          >
+            {refundable ? "Yes" : "No"}
+          </span>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span className="flex items-center text-gray-600 font-medium">
+            Created <Calendar className="w-4 h-4 ml-1 text-gray-500" />
+          </span>
+          <span className="text-gray-700 text-sm">
+            {new Date(createdAt).toLocaleString()}
+          </span>
         </div>
       </div>
+
+      {/* Secure Payment Info */}
+      <div className="bg-blue-50 rounded-xl p-4 shadow-inner space-y-3">
+        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-blue-600" />
+          Secure Payment
+        </h3>
+        <p className="text-sm text-gray-700">
+          Your payment is encrypted and processed securely.
+        </p>
+        <div className="flex items-center gap-2">
+          <Lock className="w-4 h-4 text-blue-600" />
+          <span className="text-xs text-blue-800">256-bit SSL encryption</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default async function Pay({ params }) {
+  const { hash } = params;
+
+  let paymentLink = await prisma.paymentLink.findUnique({
+    where: { paymentLinkHash: hash },
+  });
+
+  if (!paymentLink) {
+    return <p className="p-8 text-red-600">Invalid or expired payment link.</p>;
+  }
+
+  if (paymentLink.successful) {
+    return (
+      <p className="p-8 text-green-800">
+        You seem to already have paid for this itinerary. If not contact us.
+      </p>
     );
   }
 
-  if (loading) return <p className="p-5">Loading payment gateway...</p>;
-  if (error) return <p className="text-red-600 p-5">{error}</p>;
-  if (!clientSecret || !paymentLink)
-    return <p className="text-red-600 p-5">Payment data unavailable</p>;
+  const amountInCents = Math.round(paymentLink.amount * 100);
+
+  let paymentIntent = null;
+
+  if (paymentLink.stripeIntentId) {
+    try {
+      const existingIntent = await stripe.paymentIntents.retrieve(
+        paymentLink.stripeIntentId
+      );
+
+      if (existingIntent && existingIntent.status !== "canceled") {
+        paymentIntent = existingIntent;
+      }
+    } catch (err) {
+      console.warn("Existing intent not found or invalid, creating new one…");
+    }
+  }
+
+  if (!paymentIntent) {
+    paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency: "usd",
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        custom_amount: paymentLink.amount.toString(),
+        payment_link_id: paymentLink.paymentLinkHash,
+      },
+    });
+
+    paymentLink = await prisma.paymentLink.update({
+      where: { paymentLinkHash: hash },
+      data: {
+        stripeIntentId: paymentIntent.id,
+        stripeSecret: paymentIntent.client_secret,
+      },
+    });
+  }
 
   return (
-    <div className="flex flex-col lg:flex-row">
+    <main className="min-h-screen bg-white flex flex-col lg:flex-row">
       <div className="w-full lg:w-[45%] p-6 lg:p-8">
         <div className="max-w-md mx-auto">
           <h1 className="text-2xl font-bold mb-4">Complete Your Payment</h1>
@@ -128,9 +177,11 @@ export default function PayPage({ params: promisedParams }) {
           </div>
         </div>
       </div>
-      <div className="hidden lg:block lg:w-[55%] p-8">
+
+      {/* Right side: payment summary */}
+      <div className="hidden lg:block lg:w-[55%] p-8 bg-gradient-to-br from-blue-50 to-indigo-50">
         <PaymentSummary paymentLink={paymentLink} />
       </div>
-    </div>
+    </main>
   );
 }

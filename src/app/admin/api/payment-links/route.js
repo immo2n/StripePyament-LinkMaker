@@ -41,9 +41,7 @@ export async function POST(req) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: "usd",
-      automatic_payment_methods: {
-        enabled: true,
-      },
+      automatic_payment_methods: { enabled: true },
       metadata: {
         custom_amount: amount.toString(),
         payment_link_id: paymentLinkHash,
