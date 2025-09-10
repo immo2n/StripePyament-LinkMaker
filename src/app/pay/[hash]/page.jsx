@@ -5,7 +5,7 @@ import {
   ArrowClockwise,
   Calendar,
   Shield,
-  Lock
+  Lock,
 } from "@phosphor-icons/react/dist/ssr";
 import { StripeCheckoutForm } from "@/features/billing/components/checkout-form";
 import { stripe } from "@/lib/clients/stripe/server";
@@ -22,7 +22,7 @@ function PaymentSummary({ paymentLink }) {
 
   return (
     <div className="w-full max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden p-6 space-y-6">
-      {/* Itinerary / Product Image */}
+      {/* Itinerary */}
       <div className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
         <img
           src={itineraryUrl}
@@ -39,8 +39,7 @@ function PaymentSummary({ paymentLink }) {
             <User className="w-4 h-4 mr-2 text-gray-500" /> {clientName}
           </p>
           <p className="text-gray-700 flex items-center">
-            <EnvelopeSimple className="w-4 h-4 mr-2 text-gray-500" />{" "}
-            {clientEmail}
+            <EnvelopeSimple className="w-4 h-4 mr-2 text-gray-500" /> {clientEmail}
           </p>
         </div>
       )}
@@ -51,9 +50,7 @@ function PaymentSummary({ paymentLink }) {
 
         <div className="flex justify-between items-center">
           <span className="text-gray-600 font-medium">Amount</span>
-          <span className="text-xl font-bold text-gray-900">
-            ${amount.toFixed(2)}
-          </span>
+          <span className="text-xl font-bold text-gray-900">${amount.toFixed(2)}</span>
         </div>
 
         <div className="flex justify-between items-center">
@@ -62,9 +59,7 @@ function PaymentSummary({ paymentLink }) {
           </span>
           <span
             className={`px-2 py-1 rounded-full text-sm font-semibold ${
-              refundable
-                ? "bg-green-100 text-green-700"
-                : "bg-red-100 text-red-700"
+              refundable ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
             }`}
           >
             {refundable ? "Yes" : "No"}
@@ -102,31 +97,67 @@ function PaymentSummary({ paymentLink }) {
 export default async function Pay({ params }) {
   const { hash } = params;
 
-  const paymentLink = await prisma.paymentLink.findUnique({
+  let paymentLink = await prisma.paymentLink.findUnique({
     where: { paymentLinkHash: hash },
   });
-
-  try {
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentLink.stripeIntentId);
-    console.log(paymentIntent);
-  }
-  catch(e){
-    console.log(e);
-  }
 
   if (!paymentLink) {
     return <p className="p-8 text-red-600">Invalid or expired payment link.</p>;
   }
 
+  if (paymentLink.successful) {
+    return <p className="p-8 text-green-800">You seem to already have paid for this itinerary. If not contact us.</p>;
+  }
+
+  const amountInCents = Math.round(paymentLink.amount * 100);
+
+  let paymentIntent = null;
+
+  if (paymentLink.stripeIntentId) {
+    try {
+      const existingIntent = await stripe.paymentIntents.retrieve(
+        paymentLink.stripeIntentId
+      );
+
+      if (existingIntent && existingIntent.status !== "canceled") {
+        paymentIntent = existingIntent;
+      }
+    } catch (err) {
+      console.warn("Existing intent not found or invalid, creating new one…");
+    }
+  }
+
+  if (!paymentIntent) {
+    paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency: "usd",
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        custom_amount: paymentLink.amount.toString(),
+        payment_link_id: paymentLink.paymentLinkHash,
+      },
+    });
+
+    paymentLink = await prisma.paymentLink.update({
+      where: { paymentLinkHash: hash },
+      data: {
+        stripeIntentId: paymentIntent.id,
+        stripeSecret: paymentIntent.client_secret,
+      },
+    });
+  }
+
   return (
     <main className="min-h-screen bg-white flex flex-col lg:flex-row">
-      {/* Left side: payment form */}
       <div className="w-full lg:w-[45%] p-6 lg:p-8">
         <div className="max-w-md mx-auto">
           <h1 className="text-2xl font-bold mb-4">Complete Your Payment</h1>
           <p className="text-gray-600">
             Hello, {paymentLink.clientName || "Guest"}! Please complete your
-            payment of  <span className="text-2xl font-black bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">${paymentLink.amount}</span>.
+            payment of{" "}
+            <span className="text-2xl font-black bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+              ${paymentLink.amount}
+            </span>.
           </p>
           <div className="mt-5">
             <StripeCheckoutForm

@@ -25,20 +25,16 @@ export async function POST(req) {
       );
     }
 
-    // Prepare upload directory
     const uploadDir = path.join(process.cwd(), "public", "uploads");
     await mkdir(uploadDir, { recursive: true });
 
-    // Generate random filename
     const randomString = crypto.randomBytes(6).toString("hex");
     const fileName = `${Date.now()}-${randomString}.jpeg`;
     const filePath = path.join(uploadDir, fileName);
 
-    // Compress & save as JPEG 90%
     const buffer = Buffer.from(await itineraryFile.arrayBuffer());
     await sharp(buffer).jpeg({ quality: 90 }).toFile(filePath);
 
-    // Generate hashes/secrets
     const paymentLinkHash = crypto.randomBytes(12).toString("hex");
     const amountInCents = Math.round(amount * 100);
 
@@ -63,7 +59,6 @@ export async function POST(req) {
     const stripeSecret = paymentIntent.client_secret;
     const stripeIntentId = paymentIntent.id;
 
-    // Save to database
     const paymentLink = await prisma.paymentLink.create({
       data: {
         customerId,
