@@ -280,7 +280,7 @@ export default function ClientCheckoutPage({ id }: { id: string }) {
 					</div>
 
 					<div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
-						<StripeCheckoutForm amount={paymentData.amount} paymentLinkId={id} />
+						<StripeCheckoutForm amount={paymentData.amount} clientSecret="" />
 					</div>
 
 					<div className="mt-6 text-center">
