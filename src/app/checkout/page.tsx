@@ -193,7 +193,7 @@ export default async function CheckoutPage({
 						</div>
 					</div>
 
-					<StripeCheckoutForm amount={amount} />
+					<StripeCheckoutForm amount={amount} clientSecret="" />
 
 					<p className='text-xs text-gray-500 mt-6 leading-relaxed'>
 						By proceeding, you agree to our Terms of Service and authorize us
