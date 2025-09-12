@@ -1,12 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 
-type SuccessPageSearchParams = {
-  redirect_status?: string;
-  payment_intent?: string;
-  payment_intent_client_secret?: string;
-};
-
 const SuccessSVG = (
   <svg
     className="w-12 h-12 text-emerald-600"
@@ -27,31 +21,21 @@ const FailureSVG = (
   </svg>
 );
 
-export default async function SuccessPage({
-  searchParams,
-}: {
-  searchParams?: SuccessPageSearchParams;
-}) {
+export default async function SuccessPage({ searchParams }) {
   const redirect_status = searchParams?.redirect_status;
   const payment_intent = searchParams?.payment_intent;
 
   if (redirect_status === "succeeded" && payment_intent) {
-    // First, check if the record exists
     const existing = await prisma.paymentLink.findFirst({
       where: { stripeIntentId: payment_intent },
       select: { id: true, stripeIntentId: true, successful: true },
     });
 
-    console.log("Existing record:", existing);
-
     if (existing) {
-      const result = await prisma.paymentLink.updateMany({
+      await prisma.paymentLink.updateMany({
         where: { stripeIntentId: payment_intent },
         data: { successful: true },
       });
-      console.log("Update result:", result);
-    } else {
-      console.log("No matching record found for stripeIntentId:", payment_intent);
     }
   }
 
