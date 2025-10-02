@@ -32,6 +32,7 @@ model PaymentLink {
   refundable      Boolean
   clientName      String?
   clientEmail     String?
+  description     String?
   itineraryUrl    String
   stripeSecret    String?
   stripeIntentId  String?  @db.VarChar(255)

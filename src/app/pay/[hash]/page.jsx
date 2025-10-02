@@ -7,7 +7,7 @@ import {
   Shield,
   Lock,
 } from "@phosphor-icons/react/dist/ssr";
-import { StripeCheckoutForm } from "@/features/billing/components/checkout-form";
+import CustomStripeCheckoutForm from "@/features/billing/components/custom-checkout-form";
 import { stripe } from "@/lib/clients/stripe/server";
 
 function PaymentSummary({ paymentLink }) {
@@ -16,6 +16,7 @@ function PaymentSummary({ paymentLink }) {
     clientEmail,
     amount,
     refundable,
+    description,
     itineraryUrl,
     createdAt,
   } = paymentLink;
@@ -42,6 +43,16 @@ function PaymentSummary({ paymentLink }) {
             <EnvelopeSimple className="w-4 h-4 mr-2 text-gray-500" />{" "}
             {clientEmail}
           </p>
+        </div>
+      )}
+
+      {/* Description */}
+      {description && (
+        <div className="border-b pb-4 space-y-2">
+          <h3 className="text-lg font-semibold text-gray-800">
+            Payment Details
+          </h3>
+          <p className="text-gray-700 text-sm leading-relaxed">{description}</p>
         </div>
       )}
 
@@ -170,9 +181,12 @@ export default async function Pay({ params }) {
             .
           </p>
           <div className="mt-5">
-            <StripeCheckoutForm
+            <CustomStripeCheckoutForm
               amount={paymentLink.amount}
               clientSecret={paymentLink.stripeSecret}
+              paymentLinkId={paymentLink.paymentLinkHash}
+              clientName={paymentLink.clientName}
+              clientEmail={paymentLink.clientEmail}
             />
           </div>
         </div>

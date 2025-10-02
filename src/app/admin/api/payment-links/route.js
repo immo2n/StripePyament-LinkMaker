@@ -13,6 +13,7 @@ export async function POST(req) {
     const refundable = formData.get("refundable") === "true";
     const clientName = formData.get("clientName") || null;
     const clientEmail = formData.get("clientEmail") || null;
+    const description = formData.get("description") || null;
     const itineraryFile = formData.get("itinerary"); // a real File
 
     const customerIdRaw = formData.get("customerId");
@@ -53,7 +54,10 @@ export async function POST(req) {
     }
 
     console.log("Stripe PaymentIntent created successfully:", paymentIntent.id);
-    console.log("Stripe PaymentIntent created successfully:", paymentIntent.client_secret);
+    console.log(
+      "Stripe PaymentIntent created successfully:",
+      paymentIntent.client_secret
+    );
     const stripeSecret = paymentIntent.client_secret;
     const stripeIntentId = paymentIntent.id;
 
@@ -64,10 +68,11 @@ export async function POST(req) {
         refundable,
         clientName,
         clientEmail,
+        description,
         itineraryUrl: `/uploads/${fileName}`,
         paymentLinkHash,
         stripeSecret,
-        stripeIntentId
+        stripeIntentId,
       },
     });
 

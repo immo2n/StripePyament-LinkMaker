@@ -1,7 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, LayoutDashboard, Loader2, Search, Trash2 } from "lucide-react";
+import {
+  Copy,
+  LayoutDashboard,
+  Loader2,
+  Search,
+  Trash2,
+  RefreshCw,
+} from "lucide-react";
 import Image from "next/image";
 
 import { CreditCard, Plus, Trash, Eye, Gear } from "@phosphor-icons/react";
@@ -39,6 +46,7 @@ export default function AdminPage() {
     refundable: false,
     clientName: "",
     clientEmail: "",
+    description: "",
   });
 
   const [settingsError, setSettingsError] = useState("");
@@ -112,24 +120,45 @@ export default function AdminPage() {
     }
   }, []);
 
+  // Debounced search effect - only triggers when query changes
   useEffect(() => {
+    if (!authenticated) return;
+
     const delayDebounce = setTimeout(() => {
       fetchLinks(1, query);
       setCurrentPage(1);
     }, 500);
 
     return () => clearTimeout(delayDebounce);
-  }, [query]);
+  }, [query, authenticated]);
 
-  async function fetchLinks(page = 1, query = "") {
+  // Page change effect - only triggers when currentPage changes (not on initial load)
+  useEffect(() => {
+    if (!authenticated) return;
+
+    // Only fetch if we're not on page 1 or if there's no search query
+    // This prevents duplicate calls on initial load
+    if (currentPage !== 1 || query.trim() !== "") {
+      fetchLinks(currentPage, query);
+    }
+  }, [currentPage]);
+
+  // Initial load effect - only runs once when authenticated
+  useEffect(() => {
+    if (authenticated) {
+      fetchLinks(1);
+    }
+  }, [authenticated]);
+
+  async function fetchLinks(page = 1, searchQuery = "") {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: itemsPerPage.toString(),
       });
-      if (query.trim()) {
-        params.append("query", query.trim());
+      if (searchQuery.trim()) {
+        params.append("query", searchQuery.trim());
       }
 
       const res = await fetch(`/admin/list?${params.toString()}`);
@@ -147,10 +176,6 @@ export default function AdminPage() {
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    fetchLinks(currentPage);
-  }, [currentPage]);
 
   async function deleteLink(linkId) {
     if (!confirm("Are you sure you want to delete this link?")) return;
@@ -204,6 +229,7 @@ export default function AdminPage() {
     formDataToSend.append("refundable", formData.refundable);
     formDataToSend.append("clientName", formData.clientName);
     formDataToSend.append("clientEmail", formData.clientEmail);
+    formDataToSend.append("description", formData.description);
     formDataToSend.append("itinerary", formData.itinerary);
 
     setCreatingLink(true);
@@ -223,7 +249,7 @@ export default function AdminPage() {
 
       showToast("Payment link created successfully!", "success");
       console.log(result);
-      fetchLinks(1);
+      fetchLinks(1, query);
       setShowCreateForm(false);
     } catch (error) {
       setCreatingLink(false);
@@ -267,6 +293,7 @@ export default function AdminPage() {
                     refundable: false,
                     clientName: "",
                     clientEmail: "",
+                    description: "",
                   });
                   setItinaryBase64(null);
                   setShowCreateForm(true);
@@ -328,12 +355,27 @@ export default function AdminPage() {
         {/* Payment Links Table */}
         <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
           <div className="px-8 py-6 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-white/30">
-            <h2 className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-              🔗 Payment Links
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Manage and track your payment links
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                  🔗 Payment Links
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Manage and track your payment links
+                </p>
+              </div>
+              <Button
+                onClick={() => fetchLinks(currentPage, query)}
+                disabled={loading}
+                className="bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                size="sm"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </Button>
+            </div>
           </div>
 
           {loading ? (
@@ -450,7 +492,10 @@ export default function AdminPage() {
                                   `${window.location.origin}/pay/${link.paymentLinkHash}`
                                 )
                                 .then(() => {
-                                  showToast("Link copied to clipboard", "success");
+                                  showToast(
+                                    "Link copied to clipboard",
+                                    "success"
+                                  );
                                 })
                                 .catch(() => {
                                   showToast("Failed to copy", "error");
@@ -696,9 +741,10 @@ export default function AdminPage() {
                           <button
                             type="button"
                             className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"
-                            onClick={() =>
-                              setFormData({ ...formData, itinerary: "" })
-                            }
+                            onClick={() => {
+                              setFormData({ ...formData, itinerary: "" });
+                              setItinaryBase64(null);
+                            }}
                           >
                             ✕
                           </button>
@@ -775,6 +821,25 @@ export default function AdminPage() {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Description (Optional)
+                  </label>
+                  <textarea
+                    placeholder="Enter payment details, instructions, or any additional information..."
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        description: e.target.value,
+                      })
+                    }
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  />
                 </div>
               </div>
             </div>
