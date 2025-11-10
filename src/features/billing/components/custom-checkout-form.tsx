@@ -381,12 +381,6 @@ function CheckoutForm({
           {errorMessage && (
             <p className="text-red-600 text-sm text-center">{errorMessage}</p>
           )}
-
-          <div className="bg-yellow-50 p-3 rounded-lg">
-            <p className="text-xs text-yellow-800">
-              <strong>Note:</strong> Your payment is securely processed by Stripe.
-            </p>
-          </div>
         </form>
       </CardContent>
     </Card>
