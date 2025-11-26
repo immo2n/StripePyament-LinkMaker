@@ -8,12 +8,27 @@ export async function GET(req) {
     const page = parseInt(searchParams.get("page")) || 1;
     const limit = parseInt(searchParams.get("limit")) || 15;
     const skip = (page - 1) * limit;
+    const query = searchParams.get("query")?.trim() || "";
 
-    // Fetch total count for pagination
-    const totalItems = await prisma.paymentLink.count();
+    // Build where clause for search
+    const where = query
+      ? {
+          OR: [
+            { clientEmail: { contains: query, mode: "insensitive" } },
+            { clientName: { contains: query, mode: "insensitive" } },
+            { paymentLinkHash: { contains: query, mode: "insensitive" } },
+            ...(isNaN(parseInt(query)) ? [] : [{ id: { equals: parseInt(query) } }]),
+            ...(isNaN(parseFloat(query)) ? [] : [{ amount: { equals: parseFloat(query) } }]),
+          ],
+        }
+      : {};
 
-    // Fetch paginated payment links
+    // Fetch total count for pagination (with search filter if applicable)
+    const totalItems = await prisma.paymentLink.count({ where });
+
+    // Fetch paginated payment links (sorted by newest first)
     const links = await prisma.paymentLink.findMany({
+      where,
       skip,
       take: limit,
       orderBy: { createdAt: "desc" },

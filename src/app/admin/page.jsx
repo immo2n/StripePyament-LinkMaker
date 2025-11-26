@@ -165,7 +165,9 @@ export default function AdminPage() {
       const data = await res.json();
 
       if (res.ok) {
-        setLinks(data.links);
+        // Server already returns data sorted by createdAt desc (newest first)
+        // No need to sort client-side - this ensures pagination works correctly
+        setLinks(data.links || []);
         setTotalPages(data.meta.totalPages);
       } else {
         alert("Failed to fetch links!");
@@ -243,14 +245,29 @@ export default function AdminPage() {
       setCreatingLink(false);
 
       if (!response.ok) {
-        showToast(result.error || "Failed to create payment link.", "error");
+        // Ensure toast is shown for errors
+        setTimeout(() => {
+          showToast(result.error || "Failed to create payment link.", "error");
+        }, 100);
         return;
       }
 
-      showToast("Payment link created successfully!", "success");
-      console.log(result);
-      fetchLinks(1, query);
+      // Close form first
       setShowCreateForm(false);
+
+      // Clear search query and reset to page 1 to ensure new link is visible
+      setQuery("");
+      setCurrentPage(1);
+
+      // Show success toast immediately and ensure it's visible
+      setTimeout(() => {
+        showToast("Payment link created successfully!", "success");
+      }, 100);
+
+      // Fetch links after a short delay to ensure server has processed the new link
+      setTimeout(() => {
+        fetchLinks(1, "");
+      }, 300);
     } catch (error) {
       setCreatingLink(false);
       showToast("Failed to create payment link. Please try again.", "error");
